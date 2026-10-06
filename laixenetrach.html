@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lái Xe Né Tránh - Hello Kitty</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #ffe6f2, #ffb3d9);
+            color: #d63384;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            text-align: center;
+            position: relative;
+            background: #fff0f5;
+            padding: 15px;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(255, 105, 180, 0.4);
+            border: 4px solid #ff69b4;
+        }
+        canvas {
+            background: #2a2a3eb5;
+            border-radius: 15px;
+            border: 3px solid #ffb3d9;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+            display: block;
+            margin: 0 auto;
+        }
+        #ui {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-around;
+            width: 400px;
+            color: #c71585;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+        /* Màn hình menu chọn độ khó */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 240, 245, 0.95);
+            border-radius: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        #menu-screen h1 {
+            color: #ff1493;
+            margin-bottom: 20px;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(255, 105, 180, 0.3);
+        }
+        .diff-btn {
+            background: linear-gradient(to bottom, #ff69b4, #ff1493);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            margin: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 20, 147, 0.4);
+            transition: 0.2s;
+            width: 200px;
+        }
+        .diff-btn:hover {
+            transform: scale(1.05);
+            background: linear-gradient(to bottom, #ff1493, #c71585);
+        }
+        .diff-btn:active {
+            transform: scale(0.95);
+        }
+        /* Nút điều khiển cảm ứng dưới màn hình */
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            margin-top: 10px;
+        }
+        .control-btn {
+            background: linear-gradient(to bottom, #ff69b4, #ff1493);
+            color: white;
+            border: none;
+            width: 48%;
+            height: 60px;
+            font-size: 28px;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(255, 20, 147, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .control-btn:active {
+            background: #c71585;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Màn hình chọn độ khó -->
+    <div id="menu-screen">
+        <h1>🎀 Lái Xe Né Tránh 🎀</h1>
+        <button class="diff-btn" onclick="startGame('easy')">Dễ</button>
+        <button class="diff-btn" onclick="startGame('medium')">Vừa</button>
+        <button class="diff-btn" onclick="startGame('hard')">Khó</button>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="550"></canvas>
+    
+    <div id="ui">
+        <div>Điểm: <span id="score">0</span></div>
+        <div>Mạng: <span id="lives">💖💖💖</span></div>
+    </div>
+
+    <!-- Nút điều khiển mũi tên -->
+    <div id="controls">
+        <button class="control-btn" id="leftBtn">←</button>
+        <button class="control-btn" id="rightBtn">→</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreElement = document.getElementById("score");
+    const livesElement = document.getElementById("lives");
+    const menuScreen = document.getElementById("menu-screen");
+
+    // Web Audio API cho Nhạc Nền Mới & Hiệu Ứng
+    let audioCtx = null;
+    let bgmInterval = null;
+    let isPlayingBGM = false;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // Nhạc nền hoàn toàn mới (Giai điệu kẹo ngọt, vui nhộn phong cách game arcade dễ thương)
+    function startNewBGM() {
+        if (isPlayingBGM) return;
+        initAudio();
+        isPlayingBGM = true;
+
+        // Các nốt nhạc vui tươi (C major pentatonic / cute arpeggio)
+        const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 659.25, 587.33, 659.25];
+        let noteIndex = 0;
+
+        bgmInterval = setInterval(() => {
+            if (isGameOver || !audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+
+                // Dùng sóng 'sine' hoặc 'triangle' tạo âm thanh trong trẻo, dễ thương
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(melody[noteIndex], audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.18);
+
+                noteIndex = (noteIndex + 1) % melody.length;
+            } catch (e) {}
+        }, 200);
+    }
+
+    function stopBGM() {
+        clearInterval(bgmInterval);
+        bgmInterval = null;
+        isPlayingBGM = false;
+    }
+
+    // Âm thanh mất mạng / va chạm
+    function playCrashSound() {
+        if (!audioCtx) return;
+        try {
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.4);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        } catch(e) {}
+    }
+
+    // Trạng thái game
+    let score = 0;
+    let lives = 3;
+    let isGameOver = false;
+    let gameSpeed = 5;
+    let spawnRate = 0.02;
+    let invulnerableTimer = 0; // Thời gian bất tử chớp nháy sau khi va chạm
+
+    let player = {
+        x: 175,
+        y: 430,
+        width: 45,
+        height: 85,
+        speed: 7,
+        color: "#ff69b4"
+    };
+
+    let enemies = [];
+    let roadLinesOffset = 0;
+    let keys = {};
+
+    // Bàn phím
+    window.addEventListener("keydown", (e) => {
+        keys[e.key] = true;
+        if (e.code === "Space" && isGameOver) {
+            resetGame();
+        }
+    });
+    window.addEventListener("keyup", (e) => keys[e.key] = false);
+
+    // Cảm ứng nút bấm
+    const setupButton = (id, keyName) => {
+        const btn = document.getElementById(id);
+        btn.addEventListener("touchstart", (e) => { e.preventDefault(); keys[keyName] = true; });
+        btn.addEventListener("touchend", (e) => { e.preventDefault(); keys[keyName] = false; });
+        btn.addEventListener("mousedown", () => keys[keyName] = true);
+        btn.addEventListener("mouseup", () => keys[keyName] = false);
+    };
+    setupButton("leftBtn", "ArrowLeft");
+    setupButton("rightBtn", "ArrowRight");
+
+    function startGame(difficulty) {
+        menuScreen.style.display = "none";
+        resetGame();
+
+        if (difficulty === 'easy') {
+            gameSpeed = 4;
+            spawnRate = 0.015;
+        } else if (difficulty === 'medium') {
+            gameSpeed = 6;
+            spawnRate = 0.022;
+        } else if (difficulty === 'hard') {
+            // Khó: Tốc độ rất nhanh nhưng xe không quá đông ngột ngạt
+            gameSpeed = 9;
+            spawnRate = 0.018;
+        }
+
+        startNewBGM();
+        loop();
+    }
+
+    function resetGame() {
+        score = 0;
+        lives = 3;
+        isGameOver = false;
+        invulnerableTimer = 0;
+        player.x = 175;
+        enemies = [];
+        scoreElement.innerText = score;
+        livesElement.innerText = "💖💖💖";
+    }
+
+    function spawnEnemy() {
+        const lanes = [40, 125, 210, 295]; // 4 làn đường
+        const laneX = lanes[Math.floor(Math.random() * lanes.length)];
+        const colors = ["#ff3366", "#3399ff", "#9933ff", "#ff9933", "#00cc66"];
+        
+        enemies.push({
+            x: laneX,
+            y: -100,
+            width: 45,
+            height: 85,
+            speed: gameSpeed * (0.8 + Math.random() * 0.4),
+            color: colors[Math.floor(Math.random() * colors.length)]
+        });
+    }
+
+    // Vẽ đường cao tốc kiểu Hello Kitty (Hồng & Tím pastel)
+    function drawRoad() {
+        ctx.fillStyle = "#2b2b3d";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Lề đường
+        ctx.fillStyle = "#ffb3d9";
+        ctx.fillRect(10, 0, 10, canvas.height);
+        ctx.fillRect(380, 0, 10, canvas.height);
+
+        // Vạch phân cách 4 làn
+        ctx.strokeStyle = "#ff69b4";
+        ctx.lineWidth = 5;
+        ctx.setLineDash([25, 20]);
+        ctx.lineDashOffset = -roadLinesOffset;
+
+        [105, 195, 285].forEach(lx => {
+            ctx.beginPath();
+            ctx.moveTo(lx, 0);
+            ctx.lineTo(lx, canvas.height);
+            ctx.stroke();
+        });
+
+        ctx.setLineDash([]);
+    }
+
+    // Vẽ xe chi tiết giống game thật (có kính, đèn pha, bánh xe, bóng đổ)
+    function drawCar(car, isPlayer = false) {
+        if (isPlayer && invulnerableTimer > 0 && Math.floor(invulnerableTimer / 5) % 2 === 0) {
+            return; // Hiệu ứng nhấp nháy khi vừa mất mạng
+        }
+
+        ctx.save();
+        // Bóng đổ
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.fillRect(car.x + 4, car.y + 6, car.width, car.height);
+
+        // Thân xe chính
+        ctx.fillStyle = car.color;
+        ctx.beginPath();
+        ctx.roundRect(car.x, car.y, car.width, car.height, 10);
+        ctx.fill();
+
+        // Kính chắn gió trước & sau
+        ctx.fillStyle = "#111";
+        ctx.fillRect(car.x + 6, car.y + 14, car.width - 12, 18);
+        ctx.fillRect(car.x + 6, car.y + car.height - 26, car.width - 12, 12);
+
+        // Đèn pha phía trước
+        ctx.fillStyle = isPlayer ? "#ffffff" : "#ffeb3b";
+        ctx.fillRect(car.x + 4, car.y + 2, 8, 5);
+        ctx.fillRect(car.x + car.width - 12, car.y + 2, 8, 5);
+
+        // Đèn hậu
+        ctx.fillStyle = "#ff0000";
+        ctx.fillRect(car.x + 4, car.y + car.height - 5, 8, 4);
+        ctx.fillRect(car.x + car.width - 12, car.y + car.height - 5, 8, 4);
+
+        // Bánh xe
+        ctx.fillStyle = "#000";
+        ctx.fillRect(car.x - 5, car.y + 12, 5, 16);
+        ctx.fillRect(car.x + car.width, car.y + 12, 5, 16);
+        ctx.fillRect(car.x - 5, car.y + car.height - 24, 5, 16);
+        ctx.fillRect(car.x + car.width, car.y + car.height - 24, 5, 16);
+
+        if (isPlayer) {
+            // Nơ trang trí Hello Kitty xinh xắn trên nóc xe người chơi
+            ctx.fillStyle = "#ff1493";
+            ctx.beginPath();
+            ctx.arc(car.x + car.width / 2, car.y + car.height / 2, 7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function checkCollision(r1, r2) {
+        return r1.x < r2.x + r2.width - 5 &&
+               r1.x + r1.width - 5 > r2.x &&
+               r1.y < r2.y + r2.height - 5 &&
+               r1.y + r1.height - 5 > r2.y;
+    }
+
+    function update() {
+        if (isGameOver) return;
+
+        roadLinesOffset += gameSpeed;
+        if (roadLinesOffset > 45) roadLinesOffset = 0;
+
+        if (invulnerableTimer > 0) invulnerableTimer--;
+
+        // Di chuyển người chơi
+        if ((keys["ArrowLeft"] || keys["a"] || keys["A"]) && player.x > 25) {
+            player.x -= player.speed;
+        }
+        if ((keys["ArrowRight"] || keys["d"] || keys["D"]) && player.x < canvas.width - player.width - 25) {
+            player.x += player.speed;
+        }
+
+        // Sinh xe địch
+        if (Math.random() < spawnRate) {
+            spawnEnemy();
+        }
+
+        // Cập nhật xe địch
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            enemies[i].y += enemies[i].speed;
+
+            // Kiểm tra va chạm
+            if (invulnerableTimer === 0 && checkCollision(player, enemies[i])) {
+                lives--;
+                playCrashSound();
+                invulnerableTimer = 60; // 1 giây bất tử chớp nháy
+
+                let hearts = "";
+                for (let h = 0; h < lives; h++) hearts += "💖";
+                livesElement.innerText = hearts;
+
+                enemies.splice(i, 1);
+
+                if (lives <= 0) {
+                    isGameOver = true;
+                    stopBGM();
+                }
+                continue;
+            }
+
+            // Vượt qua xe địch thành công -> cộng điểm
+            if (enemies[i].y > canvas.height) {
+                enemies.splice(i, 1);
+                score += 10;
+                scoreElement.innerText = score;
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawRoad();
+        drawCar(player, true);
+
+        for (let enemy of enemies) {
+            drawCar(enemy);
+        }
+
+        // Màn hình Game Over
+        if (isGameOver) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "#ff69b4";
+            ctx.font = "bold 28px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 30);
+
+            ctx.fillStyle = "white";
+            ctx.font = "16px Arial";
+            ctx.fillText("Nhấn phím SPACE để chơi lại", canvas.width / 2, canvas.height / 2 + 15);
+            ctx.fillText("hoặc F5 để chọn lại mức độ", canvas.width / 2, canvas.height / 2 + 45);
+        }
+    }
+
+    function loop() {
+        update();
+        draw();
+        if (!isGameOver) {
+            requestAnimationFrame(loop);
+        }
+    }
+
+    // Chơi lại khi nhấn Space
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && isGameOver) {
+            resetGame();
+            startNewBGM();
+            loop();
+        }
+    });
+</script>
+
+</body>
+</html>
